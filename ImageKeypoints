@@ -1,0 +1,123 @@
+#importing libraries
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import sys
+
+#function to rescale image
+def rescale(image):
+    aspectRatio = image.shape[1] / image.shape[0]
+    newWidth = 600
+    newHeight = int(newWidth / aspectRatio)
+    resizedImage = cv2.resize(image, (newWidth, newHeight))
+    return resizedImage
+
+#function to find keypoints and descriptors
+def keypointsDescriptors(image):
+    sift = cv2.SIFT_create()
+    keypoints, descriptors = sift.detectAndCompute(image, None)
+    return keypoints, descriptors
+
+#function to calculat chi-squared distance
+def chiSquaredDistance(hist1, hist2):
+    return np.sum((hist1 - hist2) ** 2 / (hist1 + hist2 + 1e-10))
+
+#function to construct histogram of visual words
+def histogram(image, kmeans, k):
+    keypoints, descriptors = keypointsDescriptors(image)
+    if descriptors is None:
+        return np.zeros(k)
+    hist, _ = np.histogram(descriptors, bins=np.arange(k + 1))
+    return hist.astype(float)
+
+#Task One
+def task1(image_file):
+    #loading and rescaling of image
+    image = rescale(cv2.imread(image_file))
+
+    #finding keypoints
+    keypoints, _ = keypointsDescriptors(image)
+
+    #displaying keypoints
+    keypointsImage = cv2.drawKeypoints(image, keypoints, None, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+    #displaying image
+    plt.figure(figsize=(10,6))
+
+    #displaying rescaled original image
+    plt.subplot(2, 2, 1)
+    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+
+    #displaying highlighted image
+    plt.subplot(2, 2, 2)
+    plt.imshow(cv2.cvtColor(keypointsImage, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+
+    plt.subplots_adjust(wspace=0, hspace=-0.2)
+    plt.show()
+
+    #displaying the number of detected keypoints
+    print("# of keypoints in", image_file, "is" , str(len(keypoints)))
+
+#Task Two
+def task2(image_files):
+    #loading and rescaling of images
+    rescaledImages = [rescale(cv2.imread(image_file)) for image_file in image_files]
+
+    #displaying the number of keypoints for each image
+    print("Keypoints of each image:")
+    totalKeypoints = 0
+    for i, image in enumerate(rescaledImages):
+        keypoints, _ = keypointsDescriptors(image)
+        keypointsNum = len(keypoints)
+        totalKeypoints = totalKeypoints + keypointsNum
+        print("# of keypoints in", image_files[i], "is", keypointsNum)
+
+    #displaying total number of keypoints
+    print("Total number of keypoints for all images is", totalKeypoints)
+
+    #showing k percentages
+    k_percentages = [0.05, 0.10, 0.20]
+
+    #calculating dissimilarity matrix
+    imagesSize = len(image_files)
+    dissimilarityMatrix = np.zeros((imagesSize, imagesSize))
+
+    for k_percent in k_percentages:
+        k = int(k_percent * totalKeypoints)
+        print("\nK=" + str(k_percent * 100) + "%*(total number of keypoints)=" + str(k)) 
+        #creating dissimilarity matrix
+        for i in range(imagesSize):
+            for j in range(imagesSize):
+                hist1 = histogram(rescaledImages[i], None, 256) 
+                hist2 = histogram(rescaledImages[j], None, 256)  
+                dissimilarityMatrix[i, j] = chiSquaredDistance(hist1, hist2)
+
+        #displaying dissimilarity matrix
+        print("\nDissimilarity Matrix:")
+        print("   ", end="")
+
+        #arranging dissimilarity matrix
+        for image_file in image_files:
+            print(f"{'':^5}", end="")
+            print(f"{image_file:^12}", end="") 
+        print()
+        for i, image_file in enumerate(image_files):
+            print(f"{image_file:^12}", end="") 
+            for j in range(imagesSize):
+                print(f"{dissimilarityMatrix[i, j]:^12.2f}", end="") 
+            print()
+
+def main():
+    #from command arguments
+    if len(sys.argv) == 2:
+        image_file = sys.argv[1]
+        task1(image_file)
+    elif len(sys.argv) > 2:
+        image_files = sys.argv[1:]
+        task2(image_files)
+
+
+if __name__ == "__main__":
+    main()
