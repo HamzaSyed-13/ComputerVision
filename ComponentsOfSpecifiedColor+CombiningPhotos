@@ -1,0 +1,131 @@
+#importing liraries
+import numpy as np
+import matplotlib.pyplot as plt
+import cv2
+import sys
+
+#Task One
+#from command arguments
+if len(sys.argv) < 3:
+    print("Usage:")
+    print("Task One: python Chromakey.py <color_space> <image_file>")
+    print("Task Two: python Chromakey.py <person_image> <scenic_image>")
+    sys.exit(1)
+    
+arg1 = sys.argv[1]
+arg2 = sys.argv[2]
+
+if (arg1 in ("-XYZ", "-Lab", "-YCrCb", "-HSB")) and (arg2.endswith(".jpg")):
+    color_space = arg1
+    image_file = arg2
+
+    #loading image
+    image = cv2.imread(image_file)
+
+    #converting to specified color space
+    if color_space == "-XYZ":
+       converted_image = cv2.cvtColor(image, cv2.COLOR_BGR2XYZ)
+    elif color_space == "-Lab":
+       converted_image = cv2.cvtColor(image, cv2.COLOR_BGR2Lab)
+    elif color_space == "-YCrCb":
+       converted_image = cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb)
+    elif color_space == "-HSB":
+       converted_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    else:
+       print("You have entered an invalid option. Please use -XYZ, -Lab, -YCrCb, or -HSB")
+       sys.exit(1)
+
+    #splitting converted image into color components
+    c1, c2, c3 = cv2.split(converted_image)
+
+    #displaying image
+    plt.figure(figsize=(10,6))
+
+    #displaying original image
+    plt.subplot(2, 2, 1)
+    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    plt.axis("off")
+
+    #displaying color components in gray-scale
+    plt.subplot(2, 2, 2)
+    plt.imshow(c1, cmap="gray")
+    plt.axis("off")
+
+    plt.subplot(2, 2, 3)
+    plt.imshow(c2, cmap="gray")
+    plt.axis("off")
+
+    plt.subplot(2, 2, 4)
+    plt.imshow(c3, cmap="gray")
+    plt.axis("off")
+
+    plt.subplots_adjust(wspace=0, hspace=-0.2)
+    plt.show()
+
+#Task Two
+#from command arguments
+elif (arg1.endswith(".jpg")) and (arg2.endswith(".jpg")):
+    person_image = arg1
+    scenic_image = arg2
+
+    #loading images
+    person = cv2.imread(person_image)
+    scenic = cv2.imread(scenic_image)
+
+    #converting imaage to Lab color space and masking original image with binary mask
+    img = person
+    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
+    a_channel = lab[:,:,1]
+    th = cv2.threshold(a_channel,127,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)[1]
+    masked = cv2.bitwise_and(img, img, mask = th)    
+    m1 = masked.copy()
+    m1[th==0]=(255,255,255)                          
+
+    #removing green shade along the border
+    mlab = cv2.cvtColor(masked, cv2.COLOR_BGR2LAB)
+    dst = cv2.normalize(mlab[:,:,1], dst=None, alpha=0, beta=255,norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+
+    #segmenting green shaded regions
+    threshold_value = 100
+    dst_th = cv2.threshold(dst, threshold_value, 255, cv2.THRESH_BINARY_INV)[1]
+
+    #setting intensity value
+    mlab2 = mlab.copy()
+    mlab[:,:,1][dst_th == 255] = 127
+
+    #extracting person
+    img2 = cv2.cvtColor(mlab, cv2.COLOR_LAB2BGR)
+    img2[th==0]=(255,255,255)
+    extracted_person = masked
+
+    #resizing scenic image to match that of person's image
+    resized_scenic = cv2.resize(scenic, (extracted_person.shape[1], extracted_person.shape[0]))
+
+    #combining person image and scenic image
+    combined_image = cv2.addWeighted(extracted_person, 1, resized_scenic, 1, 0)
+
+    #displaying images
+    plt.figure(figsize=(12, 6))
+
+    plt.subplot(2, 2, 1)
+    plt.imshow(cv2.cvtColor(person, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+
+    plt.subplot(2, 2, 2)
+    plt.imshow(cv2.cvtColor(img2, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+
+    plt.subplot(2, 2, 3)
+    plt.imshow(cv2.cvtColor(resized_scenic, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+
+    plt.subplot(2, 2, 4)
+    plt.imshow(cv2.cvtColor(combined_image, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+
+    plt.subplots_adjust(wspace=-0.01, hspace=-0.1)
+    plt.show()
+
+else:
+    print("Invalid command.")
+
